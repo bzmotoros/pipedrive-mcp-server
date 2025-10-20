@@ -168,6 +168,8 @@ To use this server with Claude for Desktop:
 - `get-deals`: Get deals with flexible filtering options (search by title, date range, owner, stage, status, value range, etc.)
 - `get-deal`: Get a specific deal by ID (including custom fields)
 - `get-deal-notes`: Get detailed notes and custom booking details for a specific deal
+- `get-deal-activity-notes`: Get all notes from activities associated with a specific deal
+- `get-deal-all-notes`: Get all notes for a deal, including both direct deal notes and notes from related activities
 - `search-deals`: Search deals by term
 - `get-persons`: Get all persons from Pipedrive (including custom fields)
 - `get-person`: Get a specific person by ID (including custom fields)

@@ -453,6 +453,176 @@ server.tool(
   }
 );
 
+// Get notes from activities related to a deal
+server.tool(
+  "get-deal-activity-notes",
+  "Get all notes from activities associated with a specific deal",
+  {
+    dealId: z.number().describe("Pipedrive deal ID"),
+    limit: z.number().optional().describe("Maximum number of activities to retrieve (default: 100)")
+  },
+  async ({ dealId, limit = 100 }) => {
+    try {
+      const result: any = {
+        deal_id: dealId,
+        activity_notes: [],
+        activities_count: 0
+      };
+
+      // Get activities for the deal
+      try {
+        // @ts-ignore - Bypass incorrect TypeScript definition
+        const activitiesResponse = await dealsApi.getDealActivities(dealId, {
+          limit: limit
+        });
+        const activities = activitiesResponse.data || [];
+        result.activities_count = activities.length;
+
+        // Extract notes from activities
+        for (const activity of activities) {
+          if (activity.note && activity.note.trim() !== '') {
+            result.activity_notes.push({
+              activity_id: activity.id,
+              activity_type: activity.type,
+              activity_subject: activity.subject,
+              activity_due_date: activity.due_date,
+              activity_done: activity.done,
+              note: activity.note,
+              add_time: activity.add_time,
+              update_time: activity.update_time,
+              user_id: activity.user_id
+            });
+          }
+        }
+      } catch (activityError) {
+        console.error(`Error fetching activities for deal ${dealId}:`, activityError);
+        result.activities_error = getErrorMessage(activityError);
+      }
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            summary: `Retrieved ${result.activity_notes.length} notes from ${result.activities_count} activities for deal ${dealId}`,
+            ...result
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      console.error(`Error fetching deal activity notes ${dealId}:`, error);
+      return {
+        content: [{
+          type: "text",
+          text: `Error fetching deal activity notes ${dealId}: ${getErrorMessage(error)}`
+        }],
+        isError: true
+      };
+    }
+  }
+);
+
+// Get all notes for a deal (both direct notes and activity notes)
+server.tool(
+  "get-deal-all-notes",
+  "Get all notes for a deal, including both direct deal notes and notes from related activities",
+  {
+    dealId: z.number().describe("Pipedrive deal ID"),
+    notesLimit: z.number().optional().describe("Maximum number of direct notes to return (default: 20)"),
+    activitiesLimit: z.number().optional().describe("Maximum number of activities to retrieve (default: 100)")
+  },
+  async ({ dealId, notesLimit = 20, activitiesLimit = 100 }) => {
+    try {
+      const result: any = {
+        deal_id: dealId,
+        direct_notes: [],
+        activity_notes: [],
+        booking_details: null,
+        total_notes_count: 0
+      };
+
+      // Get deal details including custom fields
+      try {
+        // @ts-ignore - Bypass incorrect TypeScript definition
+        const dealResponse = await dealsApi.getDeal(dealId);
+        const deal = dealResponse.data;
+
+        // Extract custom booking field
+        const bookingFieldKey = "8f4b27fbd9dfc70d2296f23ce76987051ad7324e";
+        if (deal && deal[bookingFieldKey]) {
+          result.booking_details = deal[bookingFieldKey];
+        }
+      } catch (dealError) {
+        console.error(`Error fetching deal details for ${dealId}:`, dealError);
+        result.deal_error = getErrorMessage(dealError);
+      }
+
+      // Get direct deal notes
+      try {
+        // @ts-ignore - API parameters may not be fully typed
+        // @ts-ignore - Bypass incorrect TypeScript definition
+        const notesResponse = await notesApi.getNotes({
+          deal_id: dealId,
+          limit: notesLimit
+        });
+        result.direct_notes = notesResponse.data || [];
+      } catch (noteError) {
+        console.error(`Error fetching notes for deal ${dealId}:`, noteError);
+        result.notes_error = getErrorMessage(noteError);
+      }
+
+      // Get activities and extract notes
+      try {
+        // @ts-ignore - Bypass incorrect TypeScript definition
+        const activitiesResponse = await dealsApi.getDealActivities(dealId, {
+          limit: activitiesLimit
+        });
+        const activities = activitiesResponse.data || [];
+
+        // Extract notes from activities
+        for (const activity of activities) {
+          if (activity.note && activity.note.trim() !== '') {
+            result.activity_notes.push({
+              activity_id: activity.id,
+              activity_type: activity.type,
+              activity_subject: activity.subject,
+              activity_due_date: activity.due_date,
+              activity_done: activity.done,
+              note: activity.note,
+              add_time: activity.add_time,
+              update_time: activity.update_time,
+              user_id: activity.user_id
+            });
+          }
+        }
+      } catch (activityError) {
+        console.error(`Error fetching activities for deal ${dealId}:`, activityError);
+        result.activities_error = getErrorMessage(activityError);
+      }
+
+      result.total_notes_count = result.direct_notes.length + result.activity_notes.length;
+
+      return {
+        content: [{
+          type: "text",
+          text: JSON.stringify({
+            summary: `Retrieved ${result.total_notes_count} total notes for deal ${dealId} (${result.direct_notes.length} direct notes, ${result.activity_notes.length} activity notes)`,
+            ...result
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      console.error(`Error fetching all notes for deal ${dealId}:`, error);
+      return {
+        content: [{
+          type: "text",
+          text: `Error fetching all notes for deal ${dealId}: ${getErrorMessage(error)}`
+        }],
+        isError: true
+      };
+    }
+  }
+);
+
 // Search deals
 server.tool(
   "search-deals",
